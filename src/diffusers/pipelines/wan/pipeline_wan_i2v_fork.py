@@ -31,10 +31,8 @@ from ...video_processor import VideoProcessor
 from ..pipeline_utils import DiffusionPipeline
 from .pipeline_output import WanPipelineOutput
 
-
 if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
-
     XLA_AVAILABLE = True
 else:
     XLA_AVAILABLE = False
@@ -45,51 +43,52 @@ if is_ftfy_available():
     import ftfy
 
 EXAMPLE_DOC_STRING = """
-    Examples:
-        ```python
-        >>> import torch
-        >>> import numpy as np
-        >>> from diffusers import AutoencoderKLWan, WanImageToVideoPipeline
-        >>> from diffusers.utils import export_to_video, load_image
-        >>> from transformers import CLIPVisionModel
+Examples:
+```python
+>>> import torch
+>>> import numpy as np
+>>> from diffusers import AutoencoderKLWan, WanImageToVideoPipeline
+>>> from diffusers.utils import export_to_video, load_image
+>>> from transformers import CLIPVisionModel
 
-        >>> # Available models: Wan-AI/Wan2.1-I2V-14B-480P-Diffusers, Wan-AI/Wan2.1-I2V-14B-720P-Diffusers
-        >>> model_id = "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
-        >>> image_encoder = CLIPVisionModel.from_pretrained(
-        ...     model_id, subfolder="image_encoder", torch_dtype=torch.float32
-        ... )
-        >>> vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
-        >>> pipe = WanImageToVideoPipeline.from_pretrained(
-        ...     model_id, vae=vae, image_encoder=image_encoder, torch_dtype=torch.bfloat16
-        ... )
-        >>> pipe.to("cuda")
+>>> # Available models: Wan-AI/Wan2.1-I2V-14B-480P-Diffusers, Wan-AI/Wan2.1-I2V-14B-720P-Diffusers
+>>> model_id = "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
+>>> image_encoder = CLIPVisionModel.from_pretrained(
+...     model_id, subfolder="image_encoder", torch_dtype=torch.float32
+... )
+>>> vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
+>>> pipe = WanImageToVideoPipeline.from_pretrained(
+...     model_id, vae=vae, image_encoder=image_encoder, torch_dtype=torch.bfloat16
+... )
+>>> pipe.to("cuda")
 
-        >>> image = load_image(
-        ...     "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/diffusers/astronaut.jpg"
-        ... )
-        >>> max_area = 480 * 832
-        >>> aspect_ratio = image.height / image.width
-        >>> mod_value = pipe.vae_scale_factor_spatial * pipe.transformer.config.patch_size
-        >>> height = round(np.sqrt(max_area * aspect_ratio)) // mod_value * mod_value
-        >>> width = round(np.sqrt(max_area / aspect_ratio)) // mod_value * mod_value
-        >>> image = image.resize((width, height))
-        >>> prompt = (
-        ...     "An astronaut hatching from an egg, on the surface of the moon, the darkness and depth of space realised in "
-        ...     "the background. High quality, ultrarealistic detail and breath-taking movie-like camera shot."
-        ... )
-        >>> negative_prompt = "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards"
+>>> image = load_image(
+...     "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/diffusers/astronaut.jpg"
+... )
+>>> max_area = 480 * 832
+>>> aspect_ratio = image.height / image.width
+>>> mod_value = pipe.vae_scale_factor_spatial * pipe.transformer.config.patch_size[1]
+>>> height = round(np.sqrt(max_area * aspect_ratio)) // mod_value * mod_value
+>>> width = round(np.sqrt(max_area / aspect_ratio)) // mod_value * mod_value
+>>> image = image.resize((width, height))
 
-        >>> output = pipe(
-        ...     image=image,
-        ...     prompt=prompt,
-        ...     negative_prompt=negative_prompt,
-        ...     height=height,
-        ...     width=width,
-        ...     num_frames=81,
-        ...     guidance_scale=5.0,
-        ... ).frames
-        >>> export_to_video(output, "output.mp4", fps=16)
-        ```
+>>> prompt = (
+...     "An astronaut hatching from an egg, on the surface of the moon, the darkness and depth of space realised in "
+...     "the background. High quality, ultrarealistic detail and breath-taking movie-like camera shot."
+... )
+>>> negative_prompt = "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards"
+
+>>> output = pipe(
+...     image=image,
+...     prompt=prompt,
+...     negative_prompt=negative_prompt,
+...     height=height,
+...     width=width,
+...     num_frames=81,
+...     guidance_scale=5.0,
+... ).frames[0]
+>>> export_to_video(output, "output.mp4", fps=16)
+```
 """
 
 
@@ -130,6 +129,34 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
 
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods
     implemented for all pipelines (downloading, saving, running on a particular device, etc.).
+
+    Args:
+        tokenizer ([`T5Tokenizer`]):
+            Tokenizer from [T5](https://huggingface.co/docs/transformers/en/model_doc/t5#transformers.T5Tokenizer),
+            specifically the [google/umt5-xxl](https://huggingface.co/google/umt5-xxl) variant.
+        text_encoder ([`T5EncoderModel`]):
+            [T5](https://huggingface.co/docs/transformers/en/model_doc/t5#transformers.T5EncoderModel), specifically
+            the [google/umt5-xxl](https://huggingface.co/google/umt5-xxl) variant.
+        image_encoder ([`CLIPVisionModel`]):
+            [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPVisionModel), specifically
+            the
+            [clip-vit-huge-patch14](https://github.com/mlfoundations/open_clip/blob/main/docs/PRETRAINED.md#vit-h14-xlm-roberta-large)
+            variant.
+        transformer ([`WanTransformer3DModel`]):
+            Conditional Transformer to denoise the input latents.
+        scheduler ([`UniPCMultistepScheduler`]):
+            A scheduler to be used in combination with `transformer` to denoise the encoded image latents.
+        vae ([`AutoencoderKLWan`]):
+            Variational Auto-Encoder (VAE) Model to encode and decode videos to and from latent representations.
+        transformer_2 ([`WanTransformer3DModel`], *optional*):
+            Conditional Transformer to denoise the input latents during the low-noise stage. In two-stage denoising,
+            `transformer` handles high-noise stages and `transformer_2` handles low-noise stages. If not provided, only
+            `transformer` is used.
+        boundary_ratio (`float`, *optional*, defaults to `None`):
+            Ratio of total timesteps to use as the boundary for switching between transformers in two-stage denoising.
+            The actual boundary timestep is calculated as `boundary_ratio * num_train_timesteps`. When provided,
+            `transformer` handles timesteps >= boundary_timestep and `transformer_2` handles timesteps <
+            boundary_timestep. If `None`, only `transformer` is used for the entire denoising process.
     """
 
     model_cpu_offload_seq = "text_encoder->image_encoder->transformer->transformer_2->vae"
@@ -161,10 +188,11 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
             image_processor=image_processor,
             transformer_2=transformer_2,
         )
-        self.register_to_config(boundary_ratio=boundary_ratio, expand_timesteps=expand_timesteps)
 
+        self.register_to_config(boundary_ratio=boundary_ratio, expand_timesteps=expand_timesteps)
         self.vae_scale_factor_temporal = self.vae.config.scale_factor_temporal if getattr(self, "vae", None) else 4
         self.vae_scale_factor_spatial = self.vae.config.scale_factor_spatial if getattr(self, "vae", None) else 8
+
         self.video_processor = VideoProcessor(vae_scale_factor=self.vae_scale_factor_spatial)
         self.image_processor = image_processor
 
@@ -192,16 +220,19 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
             return_attention_mask=True,
             return_tensors="pt",
         )
+
         text_input_ids, mask = text_inputs.input_ids, text_inputs.attention_mask
         seq_lens = mask.gt(0).sum(dim=1).long()
 
         prompt_embeds = self.text_encoder(text_input_ids.to(device), mask.to(device)).last_hidden_state
         prompt_embeds = prompt_embeds.to(dtype=dtype, device=device)
+
         prompt_embeds = [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
         prompt_embeds = torch.stack(
             [torch.cat([u, u.new_zeros(max_sequence_length - u.size(0), u.size(1))]) for u in prompt_embeds], dim=0
         )
 
+        # duplicate text embeddings for each generation per prompt, using mps friendly method
         _, seq_len, _ = prompt_embeds.shape
         prompt_embeds = prompt_embeds.repeat(1, num_videos_per_prompt, 1)
         prompt_embeds = prompt_embeds.view(batch_size * num_videos_per_prompt, seq_len, -1)
@@ -218,6 +249,7 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
         image_embeds = self.image_encoder(**image, output_hidden_states=True)
         return image_embeds.hidden_states[-2]
 
+    # Copied from diffusers.pipelines.wan.pipeline_wan.WanPipeline.encode_prompt
     def encode_prompt(
         self,
         prompt: Union[str, List[str]],
@@ -230,6 +262,32 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
     ):
+        r"""
+        Encodes the prompt into text encoder hidden states.
+
+        Args:
+            prompt (`str` or `List[str]`, *optional*):
+                prompt to be encoded
+            negative_prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts not to guide the image generation. If not defined, one has to pass
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
+            do_classifier_free_guidance (`bool`, *optional*, defaults to `True`):
+                Whether to use classifier free guidance or not.
+            num_videos_per_prompt (`int`, *optional*, defaults to 1):
+                Number of videos that should be generated per prompt. torch device to place the resulting embeddings on
+            prompt_embeds (`torch.Tensor`, *optional*):
+                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
+                provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`torch.Tensor`, *optional*):
+                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
+                argument.
+            device: (`torch.device`, *optional*):
+                torch device
+            dtype: (`torch.dtype`, *optional*):
+                torch dtype
+        """
         device = device or self._execution_device
 
         prompt = [prompt] if isinstance(prompt, str) else prompt
@@ -291,12 +349,15 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
                 f"Cannot forward both `image`: {image} and `image_embeds`: {image_embeds}. Please make sure to"
                 " only forward one of the two."
             )
+
         if image is None and image_embeds is None:
             raise ValueError(
                 "Provide either `image` or `prompt_embeds`. Cannot leave both `image` and `image_embeds` undefined."
             )
+
         if image is not None and not isinstance(image, torch.Tensor) and not isinstance(image, PIL.Image.Image):
             raise ValueError(f"`image` has to be of type `torch.Tensor` or `PIL.Image.Image` but is {type(image)}")
+
         if height % 16 != 0 or width % 16 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 16 but are {height} and {width}.")
 
@@ -334,7 +395,6 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
         if self.config.boundary_ratio is not None and image_embeds is not None:
             raise ValueError("Cannot forward `image_embeds` when the pipeline's `boundary_ratio` is not configured.")
 
-    ### INÍCIO DA SEÇÃO MODIFICADA ###
     def prepare_latents(
         self,
         image: PipelineImageInput,
@@ -348,16 +408,13 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
         generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
         latents: Optional[torch.Tensor] = None,
         last_image: Optional[torch.Tensor] = None,
-        handle_image: Optional[torch.Tensor] = None,
-        handle_latent_index: int = 4,
-        handle_weight: float = 1.0,
-        anchor_weight_last: float = 1.0,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         num_latent_frames = (num_frames - 1) // self.vae_scale_factor_temporal + 1
         latent_height = height // self.vae_scale_factor_spatial
         latent_width = width // self.vae_scale_factor_spatial
 
         shape = (batch_size, num_channels_latents, num_latent_frames, latent_height, latent_width)
+
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(
                 f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
@@ -368,67 +425,59 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
             latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
         else:
             latents = latents.to(device=device, dtype=dtype)
-        
-        # --- LÓGICA DE CONDIÇÃO DE VÍDEO ---
-        video_condition = torch.zeros(batch_size, image.shape[1], num_frames, height, width, device=device, dtype=self.vae.dtype)
-        video_condition[:, :, 0:1, :, :] = image.unsqueeze(2)
-        if last_image is not None:
-            video_condition[:, :, -1:, :, :] = last_image.unsqueeze(2)
-        if handle_image is not None:
-            if 0 < handle_latent_index < num_frames -1:
-                 video_condition[:, :, handle_latent_index:handle_latent_index+1, :, :] = handle_image.unsqueeze(2)
-        
+
+        image = image.unsqueeze(2)  # [batch_size, channels, 1, height, width]
+
+        if self.config.expand_timesteps:
+            video_condition = image
+        elif last_image is None:
+            video_condition = torch.cat(
+                [image, image.new_zeros(image.shape[0], image.shape[1], num_frames - 1, height, width)], dim=2
+            )
+        else:
+            last_image = last_image.unsqueeze(2)
+            video_condition = torch.cat(
+                [image, image.new_zeros(image.shape[0], image.shape[1], num_frames - 2, height, width), last_image],
+                dim=2,
+            )
+
         video_condition = video_condition.to(device=device, dtype=self.vae.dtype)
 
-        # --- Codificação VAE ---
         latents_mean = (
-            torch.tensor(self.vae.config.latents_mean).view(1, self.vae.config.z_dim, 1, 1, 1).to(latents.device, latents.dtype)
+            torch.tensor(self.vae.config.latents_mean)
+            .view(1, self.vae.config.z_dim, 1, 1, 1)
+            .to(latents.device, latents.dtype)
         )
-        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(1, self.vae.config.z_dim, 1, 1, 1).to(latents.device, latents.dtype)
+        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(1, self.vae.config.z_dim, 1, 1, 1).to(
+            latents.device, latents.dtype
+        )
 
         if isinstance(generator, list):
-            latent_condition = [retrieve_latents(self.vae.encode(video_condition), sample_mode="argmax") for _ in generator]
+            latent_condition = [
+                retrieve_latents(self.vae.encode(video_condition), sample_mode="argmax") for _ in generator
+            ]
             latent_condition = torch.cat(latent_condition)
         else:
             latent_condition = retrieve_latents(self.vae.encode(video_condition), sample_mode="argmax")
-            latent_condition = latent_condition.repeat(batch_size, 1, 1, 1, 1)
 
+        latent_condition = latent_condition.repeat(batch_size, 1, 1, 1, 1)
         latent_condition = latent_condition.to(dtype)
         latent_condition = (latent_condition - latents_mean) * latents_std
 
-        # --- LÓGICA DA MÁSCARA COM INTERPOLAÇÃO E LOGS ---
-        logger.info("[ADUC-SDR DEBUG] Iniciando construção da máscara de interpolação...")
-        mask_lat_size = torch.zeros(batch_size, 1, num_frames, latent_height, latent_width, device=latent_condition.device)
-        
-        control_points = {0: 1.0}
-        if handle_image is not None and 0 < handle_latent_index < num_frames - 1:
-            control_points[handle_latent_index] = handle_weight
-        if last_image is not None:
-            control_points[num_frames - 1] = anchor_weight_last
+        if self.config.expand_timesteps:
+            first_frame_mask = torch.ones(
+                1, 1, num_latent_frames, latent_height, latent_width, dtype=dtype, device=device
+            )
+            first_frame_mask[:, :, 0] = 0
+            return latents, latent_condition, first_frame_mask
 
-        sorted_frames = sorted(control_points.keys())
-        logger.info(f"[ADUC-SDR DEBUG] Pontos de controle definidos em frames: {sorted_frames}")
-        logger.info(f"[ADUC-SDR DEBUG] Pesos dos pontos de controle: {control_points}")
+        mask_lat_size = torch.ones(batch_size, 1, num_frames, latent_height, latent_width)
 
-        for i in range(len(sorted_frames) - 1):
-            start_frame = sorted_frames[i]
-            end_frame = sorted_frames[i+1]
-            start_weight = control_points[start_frame]
-            end_weight = control_points[end_frame]
-            
-            logger.info(f"[ADUC-SDR DEBUG] Interpolando segmento: Frame {start_frame} (peso {start_weight:.2f}) -> Frame {end_frame} (peso {end_weight:.2f})")
-            
-            num_steps = end_frame - start_frame
-            if num_steps > 0:
-                interpolated_weights = torch.linspace(start_weight, end_weight, steps=num_steps + 1, device=mask_lat_size.device)
-                for j in range(num_steps + 1):
-                    frame_idx = start_frame + j
-                    mask_lat_size[:, :, frame_idx, :, :] = interpolated_weights[j]
+        if last_image is None:
+            mask_lat_size[:, :, list(range(1, num_frames))] = 0
+        else:
+            mask_lat_size[:, :, list(range(1, num_frames - 1))] = 0
 
-        logger.info(f"[ADUC-SDR DEBUG] Máscara de interpolação construída. Amostra de pesos por frame (primeiro pixel):")
-        logger.info(f"[ADUC-SDR DEBUG] {mask_lat_size[0, 0, :, 0, 0].cpu().numpy().round(2)}")
-
-        # --- Lógica de expansão da máscara ---
         first_frame_mask = mask_lat_size[:, :, 0:1]
         first_frame_mask = torch.repeat_interleave(first_frame_mask, dim=2, repeats=self.vae_scale_factor_temporal)
         mask_lat_size = torch.concat([first_frame_mask, mask_lat_size[:, :, 1:, :]], dim=2)
@@ -437,7 +486,6 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
         mask_lat_size = mask_lat_size.to(latent_condition.device)
 
         return latents, torch.concat([mask_lat_size, latent_condition], dim=1)
-    ### FIM DA SEÇÃO MODIFICADA ###
 
     @property
     def guidance_scale(self):
@@ -491,10 +539,12 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
         ] = None,
         callback_on_step_end_tensor_inputs: List[str] = ["latents"],
         max_sequence_length: int = 512,
-        handle_image: Optional[torch.Tensor] = None,
-        handle_weight: float = 1.0,
-        handle_latent_index: int = 4,
+        # NOVOS PARÂMETROS
         anchor_weight_last: float = 1.0,
+        anchor_latent_index: Optional[int] = None,
+        handle_image: Optional[PipelineImageInput] = None,
+        handle_weight: float = 1.0,
+        handle_latent_index: Optional[int] = 4,
     ):
         r"""
         The call function to the pipeline for generation.
@@ -520,8 +570,8 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
                 expense of slower inference.
             guidance_scale (`float`, defaults to `5.0`):
                 Guidance scale as defined in [Classifier-Free Diffusion
-                Guidance](https://huggingface.co/papers/2207/12598). `guidance_scale` is defined as `w` of equation 2.
-                of [Imagen Paper](https://huggingface.co/papers/2205/11487). Guidance scale is enabled by setting
+                Guidance](https://huggingface.co/papers/2207.12598). `guidance_scale` is defined as `w` of equation 2.
+                of [Imagen Paper](https://huggingface.co/papers/2205.11487). Guidance scale is enabled by setting
                 `guidance_scale > 1`. Higher guidance scale encourages to generate images that are closely linked to
                 the text `prompt`, usually at the expense of lower image quality.
             guidance_scale_2 (`float`, *optional*, defaults to `None`):
@@ -546,51 +596,46 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
             image_embeds (`torch.Tensor`, *optional*):
                 Pre-generated image embeddings. Can be used to easily tweak image inputs (weighting). If not provided,
                 image embeddings are generated from the `image` input argument.
-            last_image (`torch.Tensor`, *optional*):
-                The final image for the video transition. If provided, the model will use it to guide the last frame.
             output_type (`str`, *optional*, defaults to `"np"`):
                 The output format of the generated image. Choose between `PIL.Image` or `np.array`.
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`WanPipelineOutput`] instead of a plain tuple.
             attention_kwargs (`dict`, *optional*):
-                 A kwargs dictionary that if specified is passed along to the `AttentionProcessor`.
+                A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
+                `self.processor` in
+                [diffusers.models.attention_processor](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/attention_processor.py).
             callback_on_step_end (`Callable`, `PipelineCallback`, `MultiPipelineCallbacks`, *optional*):
-                A function or a subclass of `PipelineCallback` that is called at the end of each denoising step.
+                A function or a subclass of `PipelineCallback` or `MultiPipelineCallbacks` that is called at the end of
+                each denoising step during the inference. with the following arguments: `callback_on_step_end(self:
+                DiffusionPipeline, step: int, timestep: int, callback_kwargs: Dict)`. `callback_kwargs` will include a
+                list of all tensors as specified by `callback_on_step_end_tensor_inputs`.
             callback_on_step_end_tensor_inputs (`List`, *optional*):
-                The list of tensor inputs for the `callback_on_step_end` function.
+                The list of tensor inputs for the `callback_on_step_end` function. The tensors specified in the list
+                will be passed as `callback_kwargs` argument. You will only be able to include variables listed in the
+                `._callback_tensor_inputs` attribute of your pipeline class.
             max_sequence_length (`int`, defaults to `512`):
-                The maximum sequence length of the text encoder.
-            handle_image (`torch.Tensor`, *optional*):
-                An intermediate control image to guide the animation at a specific frame.
-            handle_weight (`float`, *optional*, defaults to `1.0`):
-                The weight or "strength" of the `handle_image`'s influence on the generation.
-            handle_latent_index (`int`, *optional*, defaults to `4`):
-                The frame index where the `handle_image` will be applied.
-            anchor_weight_last (`float`, *optional*, defaults to `1.0`):
-                The weight or "strength" of the `last_image`'s influence on the final frame.
+                The maximum sequence length of the text encoder. If the prompt is longer than this, it will be
+                truncated. If the prompt is shorter, it will be padded to this length.
+            # NOVOS PARÂMETROS
+            anchor_weight_last (`float`, defaults to `1.0`):
+                Weight for the last image conditioning. Values between 0.0 and 1.0 control the strength of the last image influence.
+            anchor_latent_index (`int`, *optional*, defaults to `None`):
+                Latent index where to position the last image. If None, uses the default last position.
+            handle_image (`PipelineImageInput`, *optional*):
+                Optional intermediate image to condition on at a specific latent index.
+            handle_weight (`float`, defaults to `1.0`):
+                Weight for the handle image conditioning.
+            handle_latent_index (`int`, defaults to `4`):
+                Latent index where to position the handle image.
 
         Examples:
 
         Returns:
             [`~WanPipelineOutput`] or `tuple`:
-                If `return_dict` is `True`, [`WanPipelineOutput`] is returned, otherwise a `tuple` is returned where
-                the first element is a list with the generated videos.
+            If `return_dict` is `True`, [`WanPipelineOutput`] is returned, otherwise a `tuple` is returned where
+            the first element is a list with the generated images and the second element is a list of `bool`s
+            indicating whether the corresponding generated image contains "not-safe-for-work" (nsfw) content.
         """
-        ### INÍCIO DA SEÇÃO MODIFICADA ###
-        # BANNER E LOGS DE ENTRADA
-        logger.info("======================================================================")
-        logger.info("= Running ADUC-SDR Custom Pipeline v0.0.4 (beta)                     =")
-        logger.info("= Feature: Multi-point control with interpolated weight masking.     =")
-        logger.info("======================================================================")
-        logger.info(f"[ADUC-SDR DEBUG] Call received with {num_frames} frames.")
-        logger.info(f"[ADUC-SDR DEBUG] Handle Image provided: {'Yes' if handle_image is not None else 'No'}")
-        if handle_image is not None:
-            logger.info(f"[ADUC-SDR DEBUG] -> Handle Index: {handle_latent_index}, Handle Weight: {handle_weight:.2f}")
-        logger.info(f"[ADUC-SDR DEBUG] Last Image provided: {'Yes' if last_image is not None else 'No'}")
-        if last_image is not None:
-            logger.info(f"[ADUC-SDR DEBUG] -> Last Image Anchor Weight: {anchor_weight_last:.2f}")
-        ### FIM DA SEÇÃO MODIFICADA ###
-
         if isinstance(callback_on_step_end, (PipelineCallback, MultiPipelineCallbacks)):
             callback_on_step_end_tensor_inputs = callback_on_step_end.tensor_inputs
 
@@ -612,7 +657,8 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
             logger.warning(
                 f"`num_frames - 1` has to be divisible by {self.vae_scale_factor_temporal}. Rounding to the nearest number."
             )
-            num_frames = num_frames // self.vae_scale_factor_temporal * self.vae_scale_factor_temporal + 1
+
+        num_frames = num_frames // self.vae_scale_factor_temporal * self.vae_scale_factor_temporal + 1
         num_frames = max(num_frames, 1)
 
         if self.config.boundary_ratio is not None and guidance_scale_2 is None:
@@ -652,12 +698,14 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
         if negative_prompt_embeds is not None:
             negative_prompt_embeds = negative_prompt_embeds.to(transformer_dtype)
 
+        # only wan 2.1 i2v transformer accepts image_embeds
         if self.transformer is not None and self.transformer.config.image_dim is not None:
             if image_embeds is None:
                 if last_image is None:
                     image_embeds = self.encode_image(image, device)
                 else:
                     image_embeds = self.encode_image([image, last_image], device)
+
             image_embeds = image_embeds.repeat(batch_size, 1, 1)
             image_embeds = image_embeds.to(transformer_dtype)
 
@@ -667,17 +715,20 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
 
         # 5. Prepare latent variables
         num_channels_latents = self.vae.config.z_dim
+
         image = self.video_processor.preprocess(image, height=height, width=width).to(device, dtype=torch.float32)
+
         if last_image is not None:
             last_image = self.video_processor.preprocess(last_image, height=height, width=width).to(
                 device, dtype=torch.float32
             )
-        
+
+        # Preprocess do handle (se enviado)
         if handle_image is not None:
             handle_image = self.video_processor.preprocess(handle_image, height=height, width=width).to(
                 device, dtype=torch.float32
             )
-        
+
         latents_outputs = self.prepare_latents(
             image,
             batch_size * num_videos_per_prompt,
@@ -690,16 +741,54 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
             generator,
             latents,
             last_image,
-            handle_image,
-            handle_latent_index,
-            handle_weight,
-            anchor_weight_last,
         )
 
         if self.config.expand_timesteps:
+            # Caminho expand_timesteps: condition carrega apenas imagem inicial
             latents, condition, first_frame_mask = latents_outputs
+
+            if anchor_latent_index is not None and anchor_weight_last is not None and anchor_weight_last != 1.0:
+                k = int(max(1, min(anchor_latent_index, latents.shape[2] - 1)))
+                first_frame_mask[:, :, k, :, :] = 1.0 - float(anchor_weight_last)
+
+            if handle_latent_index is not None and handle_weight is not None and handle_weight != 1.0:
+                k = int(max(1, min(handle_latent_index, latents.shape[2] - 1)))
+                first_frame_mask[:, :, k, :, :] = 1.0 - float(handle_weight)
+
         else:
+            # Caminho sem expand_timesteps
             latents, condition = latents_outputs
+            mask_ch = self.vae_scale_factor_temporal
+            cond_lat = condition[:, mask_ch:, :, :, :]
+            T_lat = cond_lat.shape[2]
+            z_dim = self.vae.config.z_dim
+            latents_mean = torch.tensor(self.vae.config.latents_mean).view(1, z_dim, 1, 1, 1).to(latents.device, latents.dtype)
+            latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(1, z_dim, 1, 1, 1).to(latents.device, latents.dtype)
+
+            if anchor_latent_index is not None:
+                k_last = int(max(1, min(anchor_latent_index, T_lat - 1)))
+                last_slice = cond_lat[:, :, -1, :, :].clone()
+                cond_lat[:, :, k_last, :, :] = last_slice
+                cond_lat[:, :, -1, :, :] = 0.0
+                if anchor_weight_last is not None and anchor_weight_last != 1.0:
+                    cond_lat[:, :, k_last, :, :] = cond_lat[:, :, k_last, :, :] * float(anchor_weight_last)
+            else:
+                if anchor_weight_last is not None and anchor_weight_last != 1.0:
+                    cond_lat[:, :, -1, :, :] = cond_lat[:, :, -1, :, :] * float(anchor_weight_last)
+
+            if handle_image is not None and handle_latent_index is not None:
+                k_handle = int(max(1, min(int(handle_latent_index), T_lat - 1)))
+                handle_vid = handle_image.unsqueeze(2)
+                handle_lat = retrieve_latents(self.vae.encode(handle_vid), sample_mode="argmax")
+                eff_bsz = cond_lat.shape[0]
+                if handle_lat.shape[0] != eff_bsz:
+                    handle_lat = handle_lat.repeat(eff_bsz, 1, 1, 1, 1)
+                handle_lat = handle_lat.to(latents.dtype, latents.device)
+                handle_lat = (handle_lat - latents_mean) * latents_std
+                hw = float(handle_weight) if handle_weight is not None else 1.0
+                cond_lat[:, :, k_handle, :, :] = handle_lat[:, :, 0, :, :] * hw
+
+            condition[:, mask_ch:, :, :, :] = cond_lat
 
         # 6. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
@@ -718,9 +807,11 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
                 self._current_timestep = t
 
                 if boundary_timestep is None or t >= boundary_timestep:
+                    # wan2.1 or high-noise stage in wan2.2
                     current_model = self.transformer
                     current_guidance_scale = guidance_scale
                 else:
+                    # low-noise stage in wan2.2
                     current_model = self.transformer_2
                     current_guidance_scale = guidance_scale_2
 
@@ -728,7 +819,9 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
                     latent_model_input = (1 - first_frame_mask) * condition + first_frame_mask * latents
                     latent_model_input = latent_model_input.to(transformer_dtype)
 
+                    # seq_len: num_latent_frames * (latent_height // patch_size) * (latent_width // patch_size)
                     temp_ts = (first_frame_mask[0][0][:, ::2, ::2] * t).flatten()
+                    # batch_size, seq_len
                     timestep = temp_ts.unsqueeze(0).expand(latents.shape[0], -1)
                 else:
                     latent_model_input = torch.cat([latents, condition], dim=1).to(transformer_dtype)
@@ -754,20 +847,24 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
                             attention_kwargs=attention_kwargs,
                             return_dict=False,
                         )[0]
-                        noise_pred = noise_uncond + current_guidance_scale * (noise_pred - noise_uncond)
 
+                    noise_pred = noise_uncond + current_guidance_scale * (noise_pred - noise_uncond)
+
+                # compute the previous noisy sample x_t -> x_t-1
                 latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
 
                 if callback_on_step_end is not None:
                     callback_kwargs = {}
                     for k in callback_on_step_end_tensor_inputs:
                         callback_kwargs[k] = locals()[k]
+
                     callback_outputs = callback_on_step_end(self, i, t, callback_kwargs)
 
                     latents = callback_outputs.pop("latents", latents)
                     prompt_embeds = callback_outputs.pop("prompt_embeds", prompt_embeds)
                     negative_prompt_embeds = callback_outputs.pop("negative_prompt_embeds", negative_prompt_embeds)
 
+                # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
 
@@ -781,6 +878,7 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
 
         if not output_type == "latent":
             latents = latents.to(self.vae.dtype)
+
             latents_mean = (
                 torch.tensor(self.vae.config.latents_mean)
                 .view(1, self.vae.config.z_dim, 1, 1, 1)
@@ -789,12 +887,14 @@ class WanImageToVideoPipeline(DiffusionPipeline, WanLoraLoaderMixin):
             latents_std = 1.0 / torch.tensor(self.vae.config.latents_std).view(1, self.vae.config.z_dim, 1, 1, 1).to(
                 latents.device, latents.dtype
             )
+
             latents = latents / latents_std + latents_mean
             video = self.vae.decode(latents, return_dict=False)[0]
             video = self.video_processor.postprocess_video(video, output_type=output_type)
         else:
             video = latents
 
+        # Offload all models
         self.maybe_free_model_hooks()
 
         if not return_dict:
