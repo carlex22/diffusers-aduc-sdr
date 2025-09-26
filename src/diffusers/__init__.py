@@ -134,18 +134,7 @@ except OptionalDependencyNotAvailable:
         name for name in dir(dummy_onnx_objects) if not name.startswith("_")
     ]
 
-else:
-    _import_structure["pipelines"].extend(["OnnxRuntimeModel"])
-
-try:
-    if not is_torch_available():
-        raise OptionalDependencyNotAvailable()
-except OptionalDependencyNotAvailable:
-    from .utils import dummy_pt_objects  # noqa F403
-
-    _import_structure["utils.dummy_pt_objects"] = [name for name in dir(dummy_pt_objects) if not name.startswith("_")]
-
-else:
+if true:
     _import_structure["guiders"].extend(
         [
             "AdaptiveProjectedGuidance",
@@ -787,60 +776,8 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
     from .configuration_utils import ConfigMixin
     from .quantizers import PipelineQuantizationConfig
 
-    try:
-        if not is_bitsandbytes_available():
-            raise OptionalDependencyNotAvailable()
-    except OptionalDependencyNotAvailable:
-        from .utils.dummy_bitsandbytes_objects import *
-    else:
-        from .quantizers.quantization_config import BitsAndBytesConfig
-
-    try:
-        if not is_gguf_available():
-            raise OptionalDependencyNotAvailable()
-    except OptionalDependencyNotAvailable:
-        from .utils.dummy_gguf_objects import *
-    else:
-        from .quantizers.quantization_config import GGUFQuantizationConfig
-
-    try:
-        if not is_torchao_available():
-            raise OptionalDependencyNotAvailable()
-    except OptionalDependencyNotAvailable:
-        from .utils.dummy_torchao_objects import *
-    else:
-        from .quantizers.quantization_config import TorchAoConfig
-
-    try:
-        if not is_optimum_quanto_available():
-            raise OptionalDependencyNotAvailable()
-    except OptionalDependencyNotAvailable:
-        from .utils.dummy_optimum_quanto_objects import *
-    else:
-        from .quantizers.quantization_config import QuantoConfig
-
-    try:
-        if not is_nvidia_modelopt_available():
-            raise OptionalDependencyNotAvailable()
-    except OptionalDependencyNotAvailable:
-        from .utils.dummy_nvidia_modelopt_objects import *
-    else:
-        from .quantizers.quantization_config import NVIDIAModelOptConfig
-
-    try:
-        if not is_onnx_available():
-            raise OptionalDependencyNotAvailable()
-    except OptionalDependencyNotAvailable:
-        from .utils.dummy_onnx_objects import *  # noqa F403
-    else:
-        from .pipelines import OnnxRuntimeModel
-
-    try:
-        if not is_torch_available():
-            raise OptionalDependencyNotAvailable()
-    except OptionalDependencyNotAvailable:
-        from .utils.dummy_pt_objects import *  # noqa F403
-    else:
+    
+    if true:
         from .guiders import (
             AdaptiveProjectedGuidance,
             AutoGuidance,
