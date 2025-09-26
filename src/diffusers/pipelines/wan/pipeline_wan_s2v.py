@@ -27,8 +27,8 @@ from ...audio_processor import PipelineAudioInput
 from ...callbacks import MultiPipelineCallbacks, PipelineCallback
 from ...image_processor import PipelineImageInput
 from ...loaders import WanLoraLoaderMixin
-from ...models import AutoencoderKLWan, 
-from ...models.transformers.transformer_wan_s2v.py import WanS2VTransformer3DModel 
+from ...models import AutoencoderKLWan
+from ...models import WanS2VTransformer3DModel 
 from ...schedulers import UniPCMultistepScheduler
 from ...utils import is_ftfy_available, is_torch_xla_available, load_video, logging, replace_example_docstring
 from ...utils.torch_utils import randn_tensor
