@@ -134,7 +134,7 @@ except OptionalDependencyNotAvailable:
         name for name in dir(dummy_onnx_objects) if not name.startswith("_")
     ]
 
-if true:
+if True:
     _import_structure["guiders"].extend(
         [
             "AdaptiveProjectedGuidance",
@@ -777,7 +777,7 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
     from .quantizers import PipelineQuantizationConfig
 
     
-    if true:
+    if True:
         from .guiders import (
             AdaptiveProjectedGuidance,
             AutoGuidance,
